@@ -146,7 +146,7 @@
 				// The final output
 				var out = "";
 				// The current location state for all three rotors
-				var loc = 0;
+				var loc = [0,0,0];
 				
 				/* Set up the rotors */
 				var rolls = [], rollturn = [];
@@ -175,21 +175,28 @@
 					rolls[num-1] = out;
 					
 					// Update location
-					loc += lToN(document.getElementById("g"+num).value)*Math.floor(Math.pow(26,3-num));
+					loc[3-num] += lToN(document.getElementById("g"+num).value);
 				});
 				
 				/* Do the encode/decode */
 				m.split('').forEach(function(letter) {
-					/* Turn and update location */
 					// Update location
-					loc++;
+					loc[2] = (loc[2] + 1) % 26;
 					// Turn rightmost
 					rolls[2] = rGround(rolls[2]);
-					// Turn middle if rightmost hits notch
-					if (rollturn[2].includes(nToL(loc%26))) {
+					
+					// Turn middle if rightmost hits notch OR the infamous double step
+					if (rollturn[2].includes(nToL(loc[2])) || rollturn[1].includes(nToL(loc[1] + 1))) {
+						// Update location
+						loc[1] = (loc[1] + 1) % 26;
+						// Turn middle
 						rolls[1] = rGround(rolls[1]);
+						
 						// Turn leftmost if middle hits notch
-						if (rollturn[1].includes(nToL((loc/26)%26))) {
+						if (rollturn[1].includes(nToL(loc[1]))) {
+							// Update location
+							loc[0] = (loc[0] + 1) % 26;
+							// Turn leftmost
 							rolls[0] = rGround(rolls[0]);
 						}
 					}
