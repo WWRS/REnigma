@@ -1,0 +1,204 @@
+<html>
+	<body style="padding:50px">
+		Type: M3
+		<br><br>
+		Reflector:
+		<select id="ref">
+			<option value="b">B</option>
+			<option value="c">C</option>
+		</select>
+		<br><br>
+		Wheels:
+		<select id="wa">
+			<option value="1" selected="selected">I</option>
+			<option value="2">II</option>
+			<option value="3">III</option>
+			<option value="4">IV</option>
+			<option value="5">V</option>
+			<option value="6">VI</option>
+			<option value="7">VII</option>
+			<option value="8">VIII</option>
+		</select>
+		<select id="wb">
+			<option value="1">I</option>
+			<option value="2" selected="selected">II</option>
+			<option value="3">III</option>
+			<option value="4">IV</option>
+			<option value="5">V</option>
+			<option value="6">VI</option>
+			<option value="7">VII</option>
+			<option value="8">VIII</option>
+		</select>
+		<select id="wc">
+			<option value="1">I</option>
+			<option value="2">II</option>
+			<option value="3" selected="selected">III</option>
+			<option value="4">IV</option>
+			<option value="5">V</option>
+			<option value="6">VI</option>
+			<option value="7">VII</option>
+			<option value="8">VIII</option>
+		</select>
+		<br><br>
+		Ring settings:
+		<input type="text" id="r1" size="1" value="A">
+		<input type="text" id="r2" size="1" value="A">
+		<input type="text" id="r3" size="1" value="A">
+		<br><br>
+		Ground settings:
+		<input type="text" id="g1" size="1" value="A">
+		<input type="text" id="g2" size="1" value="A">
+		<input type="text" id="g3" size="1" value="A">
+		<br><br>
+		Message: <br>
+		<textarea id="m" style="height:100px; width:300px"></textarea>
+		<br><br>
+		<button onclick="run()" style="padding:5px 10px 5px 10px">GO!</button>
+		<br><br><br>
+		<code id="out" style="border-style:solid; border-width:1px; padding:5px">
+		output
+		</code>
+		<script>
+			/* Declare some constants. These are looked up. */
+			// Rotor circuits
+			const ROTORS = [
+				"EKMFLGDQVZNTOWYHXUSPAIBRCJ",
+				"AJDKSIRUXBLHWTMCQGZNPYFVOE",
+				"BDFHJLCPRTXVZNYEIWGAKMUSQO",
+				"ESOVPZJAYQUIRHXLNFTGKDCMWB",
+				"VZBRGITYUPSDNHLXAWMJQOFECK",
+				"JPGVOUMFYQBENHZRDKASXLICTW",
+				"NZJHGRCXMYSWBOUFAIVLPEKQDT",
+				"FKQHTLXOCBJSPDZRAMEWNIUYGV"
+			];
+			// Notch locations
+			const ROTORTURNS = [
+				"R",
+				"F",
+				"W",
+				"K",
+				"A",
+				"AN",
+				"AN",
+				"AN"
+			];
+			// Reflector circuits
+			const REFLECTORS = [
+				"YRUHQSLDPXNGOKMIEBFZCWVJAT",
+				"FVPJIAOYEDRZXWGCTKUQSBNMHL"
+			];
+			
+			/* Math utils */
+			// Letter to number
+			function lToN(letter) {
+				return letter.charCodeAt(0) - 65;
+			}
+			// Number to letter
+			function nToL(number) {
+				return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".charAt(number % 26);
+			}
+			// Works a signal forwards
+			function newL(letter, key) {
+				return key.charAt(lToN(letter));
+			}
+			// Works a signal backwards
+			function backL(letter, key) {
+				return nToL(key.split('').indexOf(letter));
+			}
+			
+			// Turns a rotor
+			function rGround(key) {
+				var rkey = "";
+				
+				// Shift each letter down one
+				key.split('').forEach(function(letter) {
+					rkey += nToL( lToN(letter) + 25 );
+				});
+				
+				// Left shift, wrap around
+				return rkey.substring(1) + rkey.charAt(0);
+			}
+			
+			// Actually run the thing
+			function run() {
+				/* Filter inputs for settings and update */
+				// For each text input
+				["r1","r2","r3","g1","g2","g3"].forEach( function(id) {
+					// Let id_val be the initial textbox value, but only the letters
+					var id_val = document.getElementById(id).value.replace(/[^A-z]/g,'');
+					
+					if (id_val == "") {
+						// If id_val is empty, input is "A"
+						document.getElementById(id).value = 'A';
+					} else {
+						// Else, input is the first letter in id_val, capital
+						document.getElementById(id).value = id_val.charAt(0).toUpperCase();
+					}
+				});
+				
+				/* Filter input for message and update message box. */
+				var m = document.getElementById("m").value.replace(/[^A-z]/g,'').toUpperCase();
+				document.getElementById("m").value = m;
+				
+				/* Initialize some utility vars */
+				// The final output
+				var out = "";
+				// The current location state for all three rotors
+				var loc = 0;
+				
+				/* Set up the rotors */
+				var rolls = [], rollturn = [];
+				// Push base rotors and notches
+				["wa","wb","wc"].forEach(function(id) {
+					// Get which rotor pattern is in use
+					var select = document.getElementById(id).selectedIndex;
+					
+					// Push the associated properties to storage
+					rolls.push(ROTORS[select]);
+					rollturn.push(ROTORTURNS[select]);
+				});
+				// Push reflector
+				rolls.push(REFLECTORS[document.getElementById("ref").selectedIndex]);
+				// Apply rotor preshift settings
+				[1,2,3].forEach(function(num) {
+					var out = rolls[num-1];
+					
+					// Determine amount of preshifting. Empirical.
+					var times = (26 - lToN(document.getElementById("r"+num).value) + lToN(document.getElementById("g"+num).value))%26;
+					// Preshift
+					for (var i = 0; i < times; i++){
+						out = rGround(out);
+					}
+					// Apply preshift
+					rolls[num-1] = out;
+					
+					// Update location
+					loc += lToN(document.getElementById("g"+num).value)*Math.floor(Math.pow(26,3-num));
+				});
+				
+				/* Do the encode/decode */
+				m.split('').forEach(function(letter) {
+					/* Turn and update location */
+					// Update location
+					loc++;
+					// Turn rightmost
+					rolls[2] = rGround(rolls[2]);
+					// Turn middle if rightmost hits notch
+					if (rollturn[2].includes(nToL(loc%26))) {
+						rolls[1] = rGround(rolls[1]);
+						// Turn leftmost if middle hits notch
+						if (rollturn[1].includes(nToL((loc/26)%26))) {
+							rolls[0] = rGround(rolls[0]);
+						}
+					}
+					
+					// All-in-one circuit run
+					out += backL(backL(backL(newL(newL(newL(newL(letter, rolls[2]),rolls[1]),rolls[0]),rolls[3]),rolls[0]),rolls[1]),rolls[2]);
+				});
+				
+				// Output
+				document.getElementById("out").innerHTML = out;
+			}
+		</script>
+	</body>
+</html>
