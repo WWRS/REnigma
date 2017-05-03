@@ -41,21 +41,19 @@
 			<option value="8">VIII</option>
 		</select>
 		<br><br>
-		Ring settings:
-		<input type="text" id="r1" size="1" value="A">
-		<input type="text" id="r2" size="1" value="A">
-		<input type="text" id="r3" size="1" value="A">
-		<br><br>
-		Ground settings:
-		<input type="text" id="g1" size="1" value="A">
-		<input type="text" id="g2" size="1" value="A">
-		<input type="text" id="g3" size="1" value="A">
-		<br><br>
 		Message: <br>
 		<textarea id="m" style="height:100px; width:300px"></textarea>
 		<br><br>
-		<button onclick="run()" style="padding:5px 10px 5px 10px">GO!</button>
-		<br><br><br>
+		Language:
+		<select id="lang">
+			<option value="0" selected="selected">English</option>
+			<option value="1">German</option>
+		</select>
+		<br><br>
+		<button onclick="go()" style="padding:5px 10px 5px 10px">GO!</button>
+		<br><br>
+		<p id="cycle"></p>
+		<br>
 		<div style="padding:5px; border-style:solid; border-width:1px">
 		<code id="out" style="word-wrap:break-word">
 		output
@@ -91,6 +89,36 @@
 				"YRUHQSLDPXNGOKMIEBFZCWVJAT",
 				"FVPJIAOYEDRZXWGCTKUQSBNMHL"
 			];
+			// Letter frequencies 
+			const FREQS = [
+				/* English */
+				//    A       B       C       D       E
+				[0.0812, 0.0149, 0.0271, 0.0432, 0.1202,
+				//    F       G       H       I       J
+				 0.0230, 0.0203, 0.0592, 0.0731, 0.0010,
+				//    K       L       M       N       O
+				 0.0069, 0.0398, 0.0261, 0.0695, 0.0768,
+				//    P       Q       R       S       T
+				 0.0182, 0.0011, 0.0602, 0.0628, 0.0910,
+				//    U       V       W       X       Y
+				 0.0288, 0.0111, 0.0209, 0.0017, 0.0211,
+				//    Z
+				 0.0007],
+				 
+				 /* German */
+				//    A       B       C       D       E
+				[0.0612, 0.0196, 0.0316, 0.0498, 0.1693,
+				//    F       G       H       I       J
+				 0.0149, 0.0302, 0.0498, 0.0802, 0.0024,
+				//    K       L       M       N       O
+				 0.0132, 0.0360, 0.0255, 0.1053, 0.0254,
+				//    P       Q       R       S       T
+				 0.0067, 0.0002, 0.0689, 0.0679, 0.0579,
+				//    U       V       W       X       Y
+				 0.0448, 0.0084, 0.0178, 0.0005, 0.0005,
+				//    Z
+				 0.0121],
+			]
 			
 			/* Math utils */
 			// Letter to number
@@ -123,32 +151,31 @@
 				return rkey.substring(1) + rkey.charAt(0);
 			}
 			
-			// Actually run the thing
-			function run() {
-				/* Filter inputs for settings and update */
-				// For each text input
-				["r1","r2","r3","g1","g2","g3"].forEach( function(id) {
-					// Let id_val be the initial textbox value, but only the letters
-					var id_val = document.getElementById(id).value.replace(/[^A-z]/g,'');
-					
-					if (id_val == "") {
-						// If id_val is empty, input is "A"
-						document.getElementById(id).value = 'A';
-					} else {
-						// Else, input is the first letter in id_val, capital
-						document.getElementById(id).value = id_val.charAt(0).toUpperCase();
-					}
+			// Finds the population variance of str, with mean defined using lang from FREQS
+			function variance(str, lang) {
+				// Frequency of letters in this sample, init to 0's
+				var thisFreq = Array(26).fill(0);
+				
+				// Count the letters
+				str.split('').forEach( function(letter) {
+					thisFreq[ lToN(letter) ]++;
 				});
 				
+				/* Sum */
+				var score = 0;
+				// Add (x_i - mu)^2
+				for (var i = 0; i < 26; i++) {
+					score += (thisFreq[i] - FREQS[0][i] * str.length)**2;
+				}
+				
+				// Return sum/n
+				return score/str.length;
+			}
+			
+			function go() {
 				/* Filter input for message and update message box. */
 				var m = document.getElementById("m").value.replace(/[^A-z]/g,'').toUpperCase();
 				document.getElementById("m").value = m;
-				
-				/* Initialize some utility vars */
-				// The final output
-				var out = "";
-				// The current location state for all three rotors
-				var loc = [0,0,0];
 				
 				/* Set up the rotors */
 				var rolls = [], rollturn = [];
@@ -163,52 +190,99 @@
 				});
 				// Push reflector
 				rolls.push(REFLECTORS[document.getElementById("ref").selectedIndex]);
+				
+				// Get language-specific letter frequencies
+				var lang = FREQS[ document.getElementById("lang").selectedIndex ];
+				
+				/* Find candidates */
+				// The best candidate found so far
+				var minCandidate = ["", -1];
+				
+				// Begin timing
+				var d0 = new Date();
+				
+				// Try every key
+				for (var loc0 = 0; loc0 < 26; loc0++) {
+                    for (var loc1 = 0; loc1 < 26; loc1++) {
+						for (var loc2 = 0; loc2 < 26; loc2++) {
+							// Run key
+							var thisCandidate = decode( m, rolls, rollturn, [loc0, loc1, loc2], lang );
+							
+							// If thisCandidate looks better than minCandidate or was the first key, replace minCandidate with thisCandidate
+							if (thisCandidate[1] < minCandidate[1] || minCandidate[1] == [-1]) {
+								minCandidate = thisCandidate;
+							}
+						}
+					}
+                }
+				 
+				// End timing
+				var d1 = new Date();
+				// Calculate time
+				t = d1.getTime() - d0.getTime();
+				
+				// Output time
+				document.getElementById("cycle").innerHTML = t + "ms";
+				
+				// Output best candidate
+				document.getElementById("out").innerHTML =
+					minCandidate[0] +
+					" <br> -> Pattern: " + nToL(minCandidate[2][2])+nToL(minCandidate[2][1])+nToL(minCandidate[2][0]) +
+					" <br> -> Variance: " + Math.round(minCandidate[1]*10000)/10000;
+            }
+			
+			// Actually run the decoder
+			function decode(m, rolls, rollturn, locIn, lang) {
+				var m = document.getElementById("m").value
+				
+				/* Initialize some utility vars */
+				// The final output string
+				var out = "";
+				// The current location state for all three rotors. slice() makes new arrays instead of referencing.
+				var loc = locIn.slice();
+				var localRolls = rolls.slice();
+				
 				// Apply rotor preshift settings
-				[1,2,3].forEach(function(num) {
-					var out = rolls[num-1];
+				[0,1,2].forEach(function(num) {
+					var rollnum = localRolls[num];
 					
-					// Determine amount of preshifting. Empirical.
-					var times = (26 - lToN(document.getElementById("r"+num).value) + lToN(document.getElementById("g"+num).value))%26;
 					// Preshift
-					for (var i = 0; i < times; i++){
-						out = rGround(out);
+					for (var i = 0; i < locIn[2-num]; i++){
+						rollnum = rGround(rollnum);
 					}
 					// Apply preshift
-					rolls[num-1] = out;
-					
-					// Update location
-					loc[3-num] += lToN(document.getElementById("g"+num).value);
+					localRolls[num] = rollnum;
 				});
 				
 				/* Do the encode/decode */
-				m.split('').forEach(function(letter) {
+				m.split('').forEach( function(letter) {
 					// Update location
 					loc[2] = (loc[2] + 1) % 26;
 					// Turn rightmost
-					rolls[2] = rGround(rolls[2]);
+					localRolls[2] = rGround(localRolls[2]);
 					
 					// Turn middle if rightmost hits notch OR the infamous double step
 					if (rollturn[2].includes(nToL(loc[2])) || rollturn[1].includes(nToL(loc[1] + 1))) {
 						// Update location
 						loc[1] = (loc[1] + 1) % 26;
 						// Turn middle
-						rolls[1] = rGround(rolls[1]);
+						localRolls[1] = rGround(localRolls[1]);
 						
 						// Turn leftmost if middle hits notch
 						if (rollturn[1].includes(nToL(loc[1]))) {
 							// Update location
 							loc[0] = (loc[0] + 1) % 26;
 							// Turn leftmost
-							rolls[0] = rGround(rolls[0]);
+							localRolls[0] = rGround(localRolls[0]);
 						}
 					}
 					
 					// All-in-one circuit run
-					out += backL(backL(backL(newL(newL(newL(newL(letter, rolls[2]),rolls[1]),rolls[0]),rolls[3]),rolls[0]),rolls[1]),rolls[2]);
+					out += backL(backL(backL(newL(newL(newL(newL(letter, localRolls[2]),localRolls[1]),localRolls[0]),localRolls[3]),localRolls[0]),localRolls[1]),localRolls[2]);
 				});
 				
-				// Output
-				document.getElementById("out").innerHTML = out;
+				// Return this candidate
+				return [out, variance(out, lang), locIn];
 			}
 		</script>
 	</body>
